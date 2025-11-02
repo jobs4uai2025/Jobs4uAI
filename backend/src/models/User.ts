@@ -366,7 +366,6 @@ const UserSchema: Schema = new Schema(
 );
 
 // Indexes for performance
-UserSchema.index({ email: 1 });
 UserSchema.index({ 'subscription.plan': 1 });
 UserSchema.index({ 'subscription.stripeCustomerId': 1 });
 UserSchema.index({ 'subscription.stripeSubscriptionId': 1 });
