@@ -136,7 +136,7 @@ export const searchJobs = async (req: Request, res: Response) => {
         title: 1,
         company: 1,
         location: 1,
-        description: { $substr: ['$description', 0, 500] }, // Limit to 500 chars for list view
+        description: { $substrCP: ['$description', 0, 500] }, // Limit to 500 chars for list view (UTF-8 safe)
         fullDescription: '$description', // Keep full for detail view
         employmentType: 1,
         experienceLevel: 1,
@@ -155,7 +155,11 @@ export const searchJobs = async (req: Request, res: Response) => {
         isActive: 1,
         isFeatured: 1,
         matchScore: 1,
-        searchScore: 1
+        searchScore: 1,
+        isUniversityJob: 1,
+        universityName: 1,
+        isCampusExclusive: 1,
+        applicationUrl: 1
       }
     });
 
@@ -742,117 +746,6 @@ export const triggerUniversityScrape = async (req: Request, res: Response) => {
 };
 
 /**
- * GET /api/jobs/university
- * Get university-specific jobs with filters
- */
-export const getUniversityJobs = async (req: Request, res: Response) => {
-  try {
-    const {
-      university,
-      keywords,
-      location,
-      h1b,
-      opt,
-      stemOpt,
-      page = 1,
-      limit = 20
-    } = req.query;
-
-    // Build query
-    const query: any = { 
-      source: 'UNIVERSITY',
-      isActive: true 
-    };
-
-    // Filter by specific university
-    if (university) {
-      query['metadata.university'] = { $regex: university, $options: 'i' };
-    }
-
-    // Keyword search
-    if (keywords) {
-      query.$or = [
-        { title: { $regex: keywords, $options: 'i' } },
-        { description: { $regex: keywords, $options: 'i' } },
-        { company: { $regex: keywords, $options: 'i' } }
-      ];
-    }
-
-    // Location filter
-    if (location) {
-      query.location = { $regex: location, $options: 'i' };
-    }
-
-    // Visa filters
-    if (h1b === 'true') {
-      query['visaSponsorship.h1b'] = true;
-    }
-    if (opt === 'true') {
-      query['visaSponsorship.opt'] = true;
-    }
-    if (stemOpt === 'true') {
-      query['visaSponsorship.stemOpt'] = true;
-    }
-
-    // Pagination
-    const pageNum = parseInt(page as string);
-    const limitNum = parseInt(limit as string);
-    const skip = (pageNum - 1) * limitNum;
-
-    // Execute query
-    const [jobs, totalCount] = await Promise.all([
-      Job.find(query)
-        .sort({ postedDate: -1 })
-        .skip(skip)
-        .limit(limitNum)
-        .lean(),
-      Job.countDocuments(query)
-    ]);
-
-    res.json({
-      success: true,
-      data: {
-        jobs,
-        pagination: {
-          currentPage: pageNum,
-          totalPages: Math.ceil(totalCount / limitNum),
-          totalJobs: totalCount,
-          jobsPerPage: limitNum
-        }
-      }
-    });
-  } catch (error) {
-    logger.error('Error getting university jobs:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error getting university jobs'
-    });
-  }
-};
-
-/**
- * GET /api/jobs/university/stats
- * Get university job statistics
- */
-export const getUniversityJobStats = async (req: Request, res: Response) => {
-  try {
-    const stats = await universityJobScraper.getUniversityJobStats();
-
-    res.json({
-      success: true,
-      data: stats
-    });
-  } catch (error) {
-    logger.error('Error getting university job stats:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error getting university job statistics'
-    });
-  }
-};
-
-
-/**
  * GET /api/jobs/saved/organized
  * Get saved jobs organized by status (Applied, Interested, Not Interested)
  * @access Private
@@ -1357,6 +1250,121 @@ export const getSimilarJobs = async (req: Request, res: Response) => {
     res.status(500).json({
       success: false,
       message: 'Error retrieving similar jobs'
+    });
+  }
+};
+/**
+ * GET /api/jobs/university
+ * Get jobs specifically for university students (Handshake, LinkedIn internships, entry-level)
+ */
+export const getUniversityJobs = async (req: Request, res: Response) => {
+  try {
+    const {
+      page = 1,
+      limit = 50,
+      keywords,
+      location,
+      employmentType,
+    } = req.query;
+
+    const pageNum = parseInt(page as string);
+    const limitNum = parseInt(limit as string);
+    const skip = (pageNum - 1) * limitNum;
+
+    // Build match query for university-relevant jobs
+    const matchQuery: any = {
+      isActive: true,
+      $or: [
+        // Handshake jobs (all are university-focused)
+        { source: { $in: ['HANDSHAKE', 'HANDSHAKE-MOCK'] } },
+        
+        // LinkedIn/other sources: internships and entry-level
+        {
+          $and: [
+            { source: { $in: ['LINKEDIN', 'LINKEDIN-MOCK', 'REMOTEOK', 'USAJOBS', 'ARBEITNOW', 'CAREERJET', 'JOOBLE'] } },
+            {
+              $or: [
+                { employmentType: 'INTERNSHIP' },
+                { experienceLevel: 'ENTRY' },
+                { title: { $regex: /intern|internship|entry level|new grad|graduate|junior/i } },
+                { isCampusExclusive: true },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+
+    // Add additional filters
+    if (keywords) {
+      matchQuery.$text = { $search: keywords as string };
+    }
+
+    if (location) {
+      matchQuery.location = { $regex: location as string, $options: 'i' };
+    }
+
+    if (employmentType) {
+      matchQuery.employmentType = (employmentType as string).toUpperCase();
+    }
+
+    // Execute query with pagination
+    const [jobs, total] = await Promise.all([
+      Job.find(matchQuery)
+        .sort({ postedDate: -1 })
+        .skip(skip)
+        .limit(limitNum)
+        .lean(),
+      Job.countDocuments(matchQuery),
+    ]);
+
+    // Calculate source breakdown stats
+    const sourceBreakdown = await Job.aggregate([
+      { $match: matchQuery },
+      { $group: { _id: '$source', count: { $sum: 1 } } },
+    ]);
+
+    const stats = {
+      total,
+      handshake: 0,
+      linkedin: 0,
+      other: 0,
+    };
+
+    sourceBreakdown.forEach((item: any) => {
+      if (item._id.includes('HANDSHAKE')) {
+        stats.handshake += item.count;
+      } else if (item._id.includes('LINKEDIN')) {
+        stats.linkedin += item.count;
+      } else {
+        stats.other += item.count;
+      }
+    });
+
+    logger.info('University jobs retrieved', {
+      total: jobs.length,
+      page: pageNum,
+      stats,
+    });
+
+    res.json({
+      success: true,
+      data: {
+        jobs,
+        pagination: {
+          total,
+          page: pageNum,
+          limit: limitNum,
+          pages: Math.ceil(total / limitNum),
+        },
+        stats,
+      },
+    });
+  } catch (error: any) {
+    logger.error('Error getting university jobs:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching university jobs',
     });
   }
 };

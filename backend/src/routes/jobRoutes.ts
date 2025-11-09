@@ -65,6 +65,13 @@ router.post('/system/cleanup', authenticateToken, jobController.triggerCleanup);
 router.post('/aggregate', authenticateToken, jobController.triggerJobAggregation);
 
 /**
+ * @route   GET /api/jobs/university
+ * @desc    Get jobs for university students (internships, entry-level)
+ * @access  Public
+ */
+router.get('/university', jobController.getUniversityJobs);
+
+/**
  * @route   GET /api/jobs/recommendations/personalized
  * @desc    Get personalized job recommendations
  * @access  Private

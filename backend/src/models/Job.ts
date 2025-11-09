@@ -28,13 +28,14 @@ export interface IJob extends Document {
   };
   
   // Source Information
-  source: 'USAJOBS' | 'REMOTEOK' | 'ARBEITNOW' | 'CAREERJET' | 'JOOBLE' | 'UNIVERSITY' | 'MANUAL';
+  source: 'USAJOBS' | 'REMOTEOK' | 'ARBEITNOW' | 'CAREERJET' | 'JOOBLE' | 'UNIVERSITY' | 'HANDSHAKE' | 'HANDSHAKE-MOCK' | 'LINKEDIN' | 'LINKEDIN-MOCK' | 'MANUAL';
   sourceJobId: string;
   sourceUrl: string;
-  
+
   // University-specific (if applicable)
   isUniversityJob: boolean;
   universityName?: string;
+  isCampusExclusive?: boolean;
   
   // Metadata
   postedDate: Date;
@@ -130,7 +131,7 @@ const JobSchema: Schema = new Schema(
     // Source
     source: {
       type: String,
-      enum: ['USAJOBS', 'REMOTEOK', 'ARBEITNOW', 'CAREERJET', 'JOOBLE', 'UNIVERSITY', 'MANUAL'],
+      enum: ['USAJOBS', 'REMOTEOK', 'ARBEITNOW', 'CAREERJET', 'JOOBLE', 'UNIVERSITY', 'HANDSHAKE', 'HANDSHAKE-MOCK', 'LINKEDIN', 'LINKEDIN-MOCK', 'MANUAL'],
       required: true,
     },
     sourceJobId: {
@@ -142,13 +143,17 @@ const JobSchema: Schema = new Schema(
       type: String,
       required: true,
     },
-    
+
     // University
     isUniversityJob: {
       type: Boolean,
       default: false,
     },
     universityName: String,
+    isCampusExclusive: {
+      type: Boolean,
+      default: false,
+    },
     
     // Metadata
     postedDate: {

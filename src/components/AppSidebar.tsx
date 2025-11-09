@@ -1,6 +1,7 @@
 import {
   LayoutDashboard,
   Briefcase,
+  Bookmark,
   FileText,
   Mail,
   GraduationCap,
@@ -25,6 +26,7 @@ export function AppSidebar({ currentPage, onNavigate, isOpen, onClose, onLogout 
   const navItems = [
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
     { id: "jobs", label: "Job Listings", icon: Briefcase },
+    { id: "saved-jobs", label: "Saved Jobs", icon: Bookmark },
     { id: "resume", label: "Resume Tailor", icon: FileText },
     { id: "cover-letter", label: "Cover Letter", icon: Mail },
     { id: "visa-tracker", label: "Visa Tracker", icon: Calendar },

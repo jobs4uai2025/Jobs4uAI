@@ -9,6 +9,7 @@ import { LoginPage } from "./components/pages/LoginPage";
 import { SignupPage } from "./components/pages/SignupPage";
 import { DashboardPage } from "./components/pages/DashboardPage";
 import { JobsPage } from "./components/pages/JobsPage";
+import { SavedJobsPage } from "./components/pages/SavedJobsPage";
 import { ResumePage } from "./components/pages/ResumePage";
 import { CoverLetterPage } from "./components/pages/CoverLetterPage";
 import { ProfilePage } from "./components/pages/ProfilePage";
@@ -30,6 +31,7 @@ function AppContent() {
   const protectedPages = [
     "dashboard",
     "jobs",
+    "saved-jobs",
     "resume",
     "cover-letter",
     "profile",
@@ -93,6 +95,8 @@ function AppContent() {
           return <DashboardPage />;
         case "jobs":
           return <JobsPage />;
+        case "saved-jobs":
+          return <SavedJobsPage />;
         case "resume":
           return <ResumePage />;
         case "cover-letter":
