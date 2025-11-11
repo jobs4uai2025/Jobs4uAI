@@ -39,7 +39,24 @@ const app = express();
 // Environment variables
 const PORT = parseInt(process.env.PORT || '5000', 10);
 const NODE_ENV = process.env.NODE_ENV || 'development';
-const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
+
+// Support multiple frontend URLs (comma-separated)
+const getFrontendUrls = (): string[] => {
+  const frontendUrl = process.env.FRONTEND_URL || '';
+  const additionalUrls = process.env.ADDITIONAL_FRONTEND_URLS || '';
+
+  const urls = [
+    ...frontendUrl.split(',').map(url => url.trim()).filter(Boolean),
+    ...additionalUrls.split(',').map(url => url.trim()).filter(Boolean)
+  ];
+
+  // Always include localhost for development
+  const defaultUrls = ['http://localhost:5173', 'http://localhost:3000'];
+
+  return [...new Set([...defaultUrls, ...urls])]; // Remove duplicates
+};
+
+const FRONTEND_URLS = getFrontendUrls();
 
 // ==================== SENTRY INITIALIZATION ====================
 // MUST be initialized before all other middleware
@@ -65,13 +82,7 @@ app.use(
 );
 
 // CORS configuration - Support multiple origins
-const allowedOrigins = [
-  'http://localhost:5173',  // Local development
-  'http://localhost:3000',  // Alternative local port
-  process.env.FRONTEND_URL, // Primary frontend URL from env
-].filter(Boolean); // Remove undefined values
-
-logger.info(`CORS allowed origins: ${allowedOrigins.join(', ')}`);
+logger.info(`CORS allowed origins: ${FRONTEND_URLS.join(', ')}`);
 
 app.use(
   cors({
@@ -82,12 +93,12 @@ app.use(
         return callback(null, true);
       }
 
-      if (allowedOrigins.includes(origin)) {
+      if (FRONTEND_URLS.includes(origin)) {
         logger.debug(`CORS: Allowing origin: ${origin}`);
         callback(null, true);
       } else {
         logger.warn(`CORS: BLOCKED request from origin: ${origin}`);
-        logger.warn(`CORS: Allowed origins are: ${allowedOrigins.join(', ')}`);
+        logger.warn(`CORS: Allowed origins are: ${FRONTEND_URLS.join(', ')}`);
         callback(new Error('Not allowed by CORS'));
       }
     },
@@ -254,7 +265,7 @@ const startServer = async (): Promise<void> => {
       logger.info('═══════════════════════════════════════════════════');
       logger.info(`🚀 Server running on port ${PORT}`);
       logger.info(`📡 Environment: ${NODE_ENV}`);
-      logger.info(`🌐 Frontend URL: ${FRONTEND_URL}`);
+      logger.info(`🌐 Frontend URLs: ${FRONTEND_URLS.join(', ')}`);
       logger.info(`⏰ Cron Jobs: ${process.env.ENABLE_DAILY_JOB_REFRESH === 'true' ? 'ENABLED' : 'DISABLED'}`);
       if (process.env.ENABLE_DAILY_JOB_REFRESH === 'true') {
         logger.info(`📅 Cron Schedule: ${process.env.JOB_REFRESH_CRON || '0 2 * * *'}`);
